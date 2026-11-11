@@ -21,9 +21,18 @@ pipeline {
         stage('Test Application') {
             steps {
                 echo 'Testing Flask health endpoint'
-
                 bat '''
                 docker run --rm devops-monitoring-app:1.0 python -c "from app import app; r=app.test_client().get('/health'); assert r.status_code == 200; assert r.get_json()['status'] == 'healthy'; print('Health check passed')"
+                '''
+            }
+        }
+
+        stage('Deploy Application') {
+            steps {
+                echo 'Deploying application'
+                bat '''
+                docker rm -f devops-app 2>NUL
+                docker run -d -p 5001:5000 --name devops-app devops-monitoring-app:1.0
                 '''
             }
         }
@@ -31,11 +40,11 @@ pipeline {
 
     post {
         success {
-            echo 'CI Pipeline completed successfully!'
+            echo 'CI/CD Pipeline completed successfully!'
         }
-
         failure {
-            echo 'CI Pipeline failed. Check console output.'
+            echo 'CI/CD Pipeline failed. Check console output.'
         }
     }
 }
+
