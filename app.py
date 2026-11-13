@@ -1,30 +1,45 @@
-from flask import Flask, jsonify
-from datetime import datetime
+
+from flask import Flask, jsonify, Response
+from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
 
 app = Flask(__name__)
 
-@app.route("/")
+REQUEST_COUNT = Counter(
+    'app_requests_total',
+    'Total number of application requests',
+    ['method', 'endpoint', 'status']
+)
+
+@app.before_request
+def before_request():
+    pass
+
+@app.after_request
+def after_request(response):
+    if hasattr(request_context := __import__('flask').request, 'endpoint'):
+        if request_context.endpoint != 'metrics':
+            REQUEST_COUNT.labels(
+                request_context.method,
+                request_context.endpoint or 'unknown',
+                str(response.status_code)
+            ).inc()
+    return response
+
+@app.route('/')
 def home():
-    return jsonify({
-        "project": "Self Healing DevOps Platform",
-        "status": "Running",
-        "message": "Welcome to DevOps Monitoring Platform"
-    })
+    return "Self Healing DevOps Application Running!"
 
-@app.route("/health")
+@app.route('/health')
 def health():
-    return jsonify({
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat()
-    })
+    return jsonify(status="healthy")
 
-@app.route("/info")
+@app.route('/info')
 def info():
-    return jsonify({
-        "application": "DevOps Monitoring Platform",
-        "version": "1.0",
-        "environment": "Development"
-    })
+    return jsonify(application="DevOps Monitoring App")
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
+@app.route('/metrics')
+def metrics():
+    return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
